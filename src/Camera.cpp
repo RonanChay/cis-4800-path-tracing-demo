@@ -3,7 +3,7 @@
 
 Camera::Camera(GLFWwindow* window, float sensitivity, float speed) {
     this->window = window;
-    this->position = glm::vec3(-1.7f, 0.6f, 0.75f); // Optional: Default start pos
+    this->position = glm::vec3(0.0f, 0.0f, 0.0f); // Optional: Default start pos
     this->forward = glm::vec3(1.0, 0.0, 0.0);   // Start parallel to z-axis
     this->yaw = 0.0f; // Face -Z
     this->pitch = 0.0f;

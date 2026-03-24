@@ -100,7 +100,6 @@ void Model::draw(Shader* shader) {
     // Use your existing Shader class function!
     // Make sure your shader uniform is named "u_model" or change string below
     shader->SetUniform4m("u_model", modelMatrix);
-    this->lighting->sendToShader(shader);
     
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, vertexCount);

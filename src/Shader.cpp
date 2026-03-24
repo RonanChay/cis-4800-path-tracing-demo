@@ -34,6 +34,9 @@ void Shader::SetUniform3f(const char* name, glm::vec3 value) {
 void Shader::SetUniform4m(const char* name, glm::mat4 value) {
 	glUniformMatrix4fv(GetUniformLoc(name), 1, GL_FALSE, glm::value_ptr(value));
 }
+void Shader::SetUniform2f(const char* name, glm::vec2 value) {
+	glUniform2fv(GetUniformLoc(name), 1, glm::value_ptr(value));
+}
 
 GLint Shader::GetUniformLoc(const char* name) {
 	GLint loc = glGetUniformLocation(id, name);

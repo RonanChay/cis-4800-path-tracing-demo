@@ -57,6 +57,7 @@ public:
 	
 	void SetUniform1f(const char* name, GLfloat value);
 	void SetUniform1i(const char* name, GLint value);
+	void SetUniform2f(const char* name, glm::vec2 value);
 
     void setAlpha(float alpha_value);
 
