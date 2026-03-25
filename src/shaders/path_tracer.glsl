@@ -113,7 +113,7 @@ struct Plane {
 // Adapted from https://iquilezles.org/articles/intersectors/
 bool intersectsSphere(in Ray ray, in Sphere sphere, out HitInfo hit) {
     vec3 OC = ray.origin - sphere.centre;   // Distance between ray origin and sphere centre
-    float tca = dot(OC, ray.direction);   // t_ca = Projection of OC onto ray direction
+    float tca = dot(OC, ray.direction);     // t_ca = Projection of OC onto ray direction
     vec3 d = OC - tca * ray.direction;      // d = perpendicular distance between ray direction and sphere centre
     float thc = pow(sphere.radius, 2) - dot(d, d);  // thc = half of chord length ray makes with sphere
     if (thc < 0.0) 
@@ -137,6 +137,7 @@ bool intersectsPlane(in Ray ray, in Plane plane, out HitInfo hit) {
     float t = (dot((plane.point - ray.origin), plane.normal)) / dot(ray.direction, plane.normal);
     if (t < EPSILON) return false;  // Plane does not intersect with ray
 
+    // Ray intersects with plane - update hit information
     hit.distanceAlongRay = t;
     hit.normal = plane.normal;
     hit.objectColour = plane.colour;
@@ -153,8 +154,8 @@ bool worldIntersect(in Ray ray, out HitInfo objectHit) {
 
     // Scene model definition
     Sphere lightSphere = Sphere(
-        vec3(0.0, 0.4, -3.0),
-        // vec3(0.5*sin(u_time), 0.4, 0.5*cos(u_time) - 3.0),
+        // vec3(0.0, 0.4, -3.0),
+        vec3(0.5*sin(u_time), 0.4, 0.5*cos(u_time) - 3.0),
         0.1,
         vec3(0.0),
         vec3(200.0),
@@ -185,14 +186,14 @@ bool worldIntersect(in Ray ray, out HitInfo objectHit) {
     Plane leftWall = Plane(
         vec3(-1.0, 0.0, 0.0),
         vec3(1.0, 0.0, 0.0),
-        vec3(0.8, 0.1, 0.1),
+        0.8*vec3(0.8, 0.1, 0.1),
         vec3(0.0),
         1.0
     );
     Plane rightWall = Plane(
         vec3(1.0, 0.0, 0.0),
         vec3(-1.0, 0.0, 0.0),
-        vec3(0.1, 0.8, 0.1),
+        0.8*vec3(0.1, 0.8, 0.1),
         vec3(0.0),
         1.0
     );
