@@ -106,7 +106,7 @@ int main(void) {
     }
     int writeBuffer = 0;
     int frames = 0;
-    int samples_per_frame = 16;
+    int samples_per_pixel = 32;
     int max_bounces = 8;
 
     int rendering_mode = 2;     // 1: no blending   |   2: temporal accumulation
@@ -147,12 +147,12 @@ int main(void) {
 		if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, true);
 
-        // Change SAMPLES_PER_FRAME
+        // Change SAMPLES_PER_PIXEL
         if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
             if (key_pressed[0] == 0) {
                 key_pressed[0] = 1;
-                samples_per_frame *= 2;
-                printf("Samples per frame: %d\n", samples_per_frame);
+                samples_per_pixel *= 2;
+                printf("Samples per pixel: %d\n", samples_per_pixel);
             }
         }
         if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_RELEASE)  {
@@ -161,8 +161,8 @@ int main(void) {
         if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
             if (key_pressed[1] == 0) {
                 key_pressed[1] = 1;
-                samples_per_frame /= 2;
-                printf("Samples per frame: %d\n", samples_per_frame);
+                samples_per_pixel /= 2;
+                printf("Samples per pixel: %d\n", samples_per_pixel);
             }
         }
         if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_RELEASE)  {
@@ -232,7 +232,7 @@ int main(void) {
             shader_path_tracer.SetUniform1i("u_rendering_mode", rendering_mode);
             shader_path_tracer.SetUniform1f("u_time", cur_time);
             shader_path_tracer.SetUniform1i("u_max_bounces", max_bounces);
-            shader_path_tracer.SetUniform1i("u_samples_per_frame", samples_per_frame);
+            shader_path_tracer.SetUniform1i("u_samples_per_pixel", samples_per_pixel);
             shader_path_tracer.SetUniform2f("u_resolution", glm::vec2(windowWidth, windowHeight));
     
             path_trace_quad.draw(&shader_path_tracer);
@@ -247,7 +247,7 @@ int main(void) {
             shader_path_tracer.SetUniform1i("u_frames", frames);
             shader_path_tracer.SetUniform1f("u_time", cur_time);
             shader_path_tracer.SetUniform1i("u_max_bounces", max_bounces);
-            shader_path_tracer.SetUniform1i("u_samples_per_frame", samples_per_frame);
+            shader_path_tracer.SetUniform1i("u_samples_per_pixel", samples_per_pixel);
             shader_path_tracer.SetUniform2f("u_resolution", glm::vec2(windowWidth, windowHeight));
     
             glActiveTexture(GL_TEXTURE0);
