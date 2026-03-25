@@ -100,7 +100,6 @@ void Camera::update(float deltaTime) {
     // --- TASK 3: MOVEMENT (WASD) ---
     // Move POSITION using the calculated vectors
     this->processKeyboardInput(right, speed);
-
 }
 
 /// @brief Construct and return view matrix

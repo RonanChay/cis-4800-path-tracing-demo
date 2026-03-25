@@ -30,7 +30,9 @@ int main(void) {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3); 
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // Required for Mac
-	window = glfwCreateWindow(640*2, 480*2, "What if there was a skytrain in Guelph for some insane reason?", NULL, NULL);
+    uint windowWidth = 640*2;
+    uint windowHeight = 480*2;
+	window = glfwCreateWindow(windowWidth, windowHeight, "Tracing the path to some balls", NULL, NULL);
 	if (!window) {
 		glfwTerminate();
 		return -1;
@@ -47,84 +49,78 @@ int main(void) {
 	/********************************** 
         Create + initialize Models
     **********************************/
+    ModelLighting basic_lighting(
+        glm::vec3(0.0f),
+        glm::vec3(0.0f),
+        glm::vec3(0.0f),
+        0.0f
+    );
 
-    GLfloat cube_data[] = { 
-        // position xyzh,       normal xyzw,            color rgba
-		-1.0f,-1.0f,-1.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f,-1.0f, 1.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f, 1.0f, 1.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-												
-		1.0f, 1.0f,-1.0f,1.0,	0.0f,0.0f,-1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f,-1.0f,-1.0f,1.0,	0.0f,0.0f,-1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f, 1.0f,-1.0f,1.0,	0.0f,0.0f,-1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-												
-		1.0f,-1.0f, 1.0f,1.0,	0.0f,-1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f,-1.0f,-1.0f,1.0,	0.0f,-1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		1.0f,-1.0f,-1.0f,1.0,	0.0f,-1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-												
-		1.0f, 1.0f,-1.0f,1.0,	0.0f,0.0f,-1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		1.0f,-1.0f,-1.0f,1.0,	0.0f,0.0f,-1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f,-1.0f,-1.0f,1.0,	0.0f,0.0f,-1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-												
-		-1.0f,-1.0f,-1.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f, 1.0f, 1.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f, 1.0f,-1.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-												
-		1.0f,-1.0f, 1.0f,1.0,	0.0f,-1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f,-1.0f, 1.0f,1.0,	0.0f,-1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f,-1.0f,-1.0f,1.0,	0.0f,-1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-
-		-1.0f, 1.0f, 1.0f,1.0,	0.0f,0.0f,1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f,-1.0f, 1.0f,1.0,	0.0f,0.0f,1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		1.0f,-1.0f, 1.0f,1.0,	0.0f,0.0f,1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-											   
-		1.0f, 1.0f, 1.0f,1.0,	1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		1.0f,-1.0f,-1.0f,1.0,	1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		1.0f, 1.0f,-1.0f,1.0,	1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-											   
-		1.0f,-1.0f,-1.0f,1.0,	1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		1.0f, 1.0f, 1.0f,1.0,	1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		1.0f,-1.0f, 1.0f,1.0,	1.0f,0.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-											   
-		1.0f, 1.0f, 1.0f,1.0,	0.0f,1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		1.0f, 1.0f,-1.0f,1.0,	0.0f,1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f, 1.0f,-1.0f,1.0,	0.0f,1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-											   
-		1.0f, 1.0f, 1.0f,1.0,	0.0f,1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f, 1.0f,-1.0f,1.0,	0.0f,1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f, 1.0f, 1.0f,1.0,	0.0f,1.0f,0.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-											   
-		1.0f, 1.0f, 1.0f,1.0,	0.0f,0.0f,1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		-1.0f, 1.0f, 1.0f,1.0,	0.0f,0.0f,1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f,
-		1.0f,-1.0f, 1.0f,1.0,	0.0f,0.0f,1.0f,0.0f,	1.0f,1.0f,1.0f,1.0f
-	};
-    
     /********************************** 
         Create + initialize Camera 
     **********************************/
     float CAM_SENS = 200.0;
-    float MOVEMENT_SPEED = 20.0;
+    float MOVEMENT_SPEED = 200.0;
     Camera camera(window, CAM_SENS, MOVEMENT_SPEED);
 
     /*******************************************
-        Create + initialize point lights
+        Initialize Path Tracing
     *******************************************/
-    GlobalLighting globalLighting(glm::vec3(0.7f));
+    GLfloat fullscreen_quad[] = { 
+        // position xyzh,       normal xyzw,            color rgba
+		-1.0f,-1.0f,0.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	0.0f,0.0f,0.0f,1.0f,
+		 1.0f,-1.0f,0.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	0.0f,0.0f,0.0f,1.0f,
+		-1.0f, 1.0f,0.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	0.0f,0.0f,0.0f,1.0f,
+         1.0f, 1.0f,0.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	0.0f,0.0f,0.0f,1.0f,
+		-1.0f, 1.0f,0.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	0.0f,0.0f,0.0f,1.0f,
+		 1.0f,-1.0f,0.0f,1.0,	-1.0f,0.0f,0.0f,0.0f,	0.0f,0.0f,0.0f,1.0f,
+    };
+
+    Model path_trace_quad(0, &basic_lighting);
+    path_trace_quad.init(fullscreen_quad, sizeof(fullscreen_quad)/sizeof(float), "fullscreen_quad");
+
+    GLuint fbo[2], texture[2];
+    for (int i = 0; i < 2; i++) {
+        glGenFramebuffers(1, &fbo[i]);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
+
+        glGenTextures(1, &texture[i]);
+        glBindTexture(GL_TEXTURE_2D, texture[i]);
+        glTexImage2D(
+            GL_TEXTURE_2D, 0, GL_RGB32F,
+            windowWidth, windowHeight, 0, GL_RGB,
+            GL_FLOAT, NULL
+        );
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        glFramebufferTexture2D(
+            GL_FRAMEBUFFER, 
+            GL_COLOR_ATTACHMENT0, 
+            GL_TEXTURE_2D, 
+            texture[i], 
+            0
+        );
+    }
+    int writeBuffer = 0;
+    int frames = 0;
+    int samples_per_frame = 16;
+    int max_bounces = 8;
+
+    int rendering_mode = 2;     // 1: no blending   |   2: temporal accumulation
 
 	/********************************** 
         Create shader program 
     **********************************/
-    Shader shader_phong("src/shaders/phong_shading.glsl");
-    Shader shader_basic("src/shaders/basic.glsl");
-    shader_phong.Bind();
+    Shader shader_path_tracer("src/shaders/path_tracer.glsl");
+    Shader shader_tone_mapper("src/shaders/tonemapper.glsl");
+    shader_path_tracer.Bind();
 
     glfwSwapInterval(1);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glEnable(GL_CULL_FACE);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
 
     /********************************** 
             Delta time 
@@ -134,8 +130,8 @@ int main(void) {
 	/***********************************
      *      Render Loop
      **********************************/
-	while (!glfwWindowShouldClose(window))
-	{
+    int key_pressed[4] = {0, 0, 0, 0};
+	while (!glfwWindowShouldClose(window)) {
         clock_t timeSinceStart = clock();
         float deltaTime = ((float)(timeSinceStart - oldTimeSinceStart)) / CLOCKS_PER_SEC;
         oldTimeSinceStart = timeSinceStart;
@@ -148,16 +144,73 @@ int main(void) {
         
         glfwPollEvents();
         glfwSetInputMode(window, GLFW_STICKY_KEYS, 1);
-        // Lock cursor to window
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
-
 		if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, true);
 
+        // Change SAMPLES_PER_FRAME
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+            if (key_pressed[0] == 0) {
+                key_pressed[0] = 1;
+                samples_per_frame *= 2;
+                printf("Samples per frame: %d\n", samples_per_frame);
+            }
+        }
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_RELEASE)  {
+            key_pressed[0] = 0;
+        }
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+            if (key_pressed[1] == 0) {
+                key_pressed[1] = 1;
+                samples_per_frame /= 2;
+                printf("Samples per frame: %d\n", samples_per_frame);
+            }
+        }
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_RELEASE)  {
+            key_pressed[1] = 0;
+        }
+
+        // Change MAX_BOUNCES
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+            if (key_pressed[2] == 0) {
+                key_pressed[2] = 1;
+                max_bounces += 1;
+                printf("Max Bounces: %d\n", max_bounces);
+            }
+        }
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_RELEASE)  {
+            key_pressed[2] = 0;
+        }
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+            if (key_pressed[3] == 0) {
+                key_pressed[3] = 1;
+                max_bounces -= 1;
+                printf("Max Bounces: %d\n", max_bounces);
+            }
+        }
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_RELEASE)  {
+            key_pressed[3] = 0;
+        }
+
+        // Change rendering_mode
+        if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS) {
+            printf(">>> Disabled Temporal Accumulation\n");
+            rendering_mode = 1;
+        }
+        if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS) {
+            printf(">>> Enabled Temporal Accumulation\n");
+            rendering_mode = 2;
+        }
+
         // --- Camera movement ---
+        static glm::vec3 lastCameraPos = camera.getPosition();
         camera.update(deltaTime);
-        camera.sendToShader(&shader_basic);
-        camera.sendToShader(&shader_phong);
+        if (camera.getPosition() != lastCameraPos) {
+            frames = 0;
+            lastCameraPos = camera.getPosition();
+        }
+        camera.sendToShader(&shader_path_tracer);
+        camera.sendToShader(&shader_tone_mapper);
+        shader_path_tracer.SetUniform3f("u_cameraPosition", camera.getPosition());
 
 		/********************************************
          *            Update game state
@@ -167,14 +220,61 @@ int main(void) {
          ********************************************/
         double cur_time = glfwGetTime();
 
-
 		/***********************************
          *      Render scene
          ***********************************/
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
+        if (rendering_mode == 1) {
+            // No temporal accumulation
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glClear(GL_COLOR_BUFFER_BIT);
+            
+            shader_path_tracer.Bind();
+            shader_path_tracer.SetUniform1i("u_rendering_mode", rendering_mode);
+            shader_path_tracer.SetUniform1f("u_time", cur_time);
+            shader_path_tracer.SetUniform1i("u_max_bounces", max_bounces);
+            shader_path_tracer.SetUniform1i("u_samples_per_frame", samples_per_frame);
+            shader_path_tracer.SetUniform2f("u_resolution", glm::vec2(windowWidth, windowHeight));
+    
+            path_trace_quad.draw(&shader_path_tracer);
+        }
+        else {
+            // Temporal accumulation
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo[writeBuffer]);
+            glClear(GL_COLOR_BUFFER_BIT);
+            
+            shader_path_tracer.Bind();
+            shader_path_tracer.SetUniform1i("u_rendering_mode", rendering_mode);
+            shader_path_tracer.SetUniform1i("u_frames", frames);
+            shader_path_tracer.SetUniform1f("u_time", cur_time);
+            shader_path_tracer.SetUniform1i("u_max_bounces", max_bounces);
+            shader_path_tracer.SetUniform1i("u_samples_per_frame", samples_per_frame);
+            shader_path_tracer.SetUniform2f("u_resolution", glm::vec2(windowWidth, windowHeight));
+    
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, texture[1-writeBuffer]);
+            shader_path_tracer.SetUniform1i("u_accumulatedTexture", 0);
+            path_trace_quad.draw(&shader_path_tracer);
+    
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, windowWidth, windowHeight);
+            glClear(GL_COLOR_BUFFER_BIT);
+    
+            shader_tone_mapper.Bind();
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, texture[writeBuffer]);
+            shader_tone_mapper.SetUniform1i("u_texture", 0);
+            path_trace_quad.draw(&shader_tone_mapper);
+    
+            writeBuffer = 1-writeBuffer;
+            frames++;
+        }
+
 		glfwSwapBuffers(window);
 	}
+    for (int i = 0; i < 2; i++) {
+        glDeleteFramebuffers(1, &fbo[i]);
+        glDeleteTextures(1, &texture[i]);
+    }
 
 	glfwTerminate();
 	return 0;
