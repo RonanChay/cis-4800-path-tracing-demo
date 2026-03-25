@@ -30,8 +30,8 @@ int main(void) {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3); 
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // Required for Mac
-    uint windowWidth = 640*2;
-    uint windowHeight = 480*2;
+    int windowWidth = 640;
+    int windowHeight = 480;
 	window = glfwCreateWindow(windowWidth, windowHeight, "Tracing the path to some balls", NULL, NULL);
 	if (!window) {
 		glfwTerminate();
@@ -135,6 +135,38 @@ int main(void) {
         clock_t timeSinceStart = clock();
         float deltaTime = ((float)(timeSinceStart - oldTimeSinceStart)) / CLOCKS_PER_SEC;
         oldTimeSinceStart = timeSinceStart;
+
+        // Poll for window size changes - rebuild FBOs and reset frames if window size changed
+        int prevWidth = windowWidth;
+        int prevHeight = windowHeight;
+        glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
+        if (prevWidth != windowWidth || prevHeight != windowHeight) {
+            frames = 0;
+            for (int i = 0; i < 2; i++) {
+                glGenFramebuffers(1, &fbo[i]);
+                glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
+
+                glGenTextures(1, &texture[i]);
+                glBindTexture(GL_TEXTURE_2D, texture[i]);
+                glTexImage2D(
+                    GL_TEXTURE_2D, 0, GL_RGB32F,
+                    windowWidth, windowHeight, 0, GL_RGB,
+                    GL_FLOAT, NULL
+                );
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER, 
+                    GL_COLOR_ATTACHMENT0, 
+                    GL_TEXTURE_2D, 
+                    texture[i], 
+                    0
+                );
+            }
+        }
 
 		/*********************************************
          *              Process Inputs
