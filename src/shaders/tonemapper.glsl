@@ -21,18 +21,7 @@ in vec2 fragmentTexCoord;
 out vec4 fragColor;
 uniform sampler2D u_texture;
 
-vec3 ACESFilm(vec3 x) {
-    float a = 2.51;
-    float b = 0.03;
-    float c = 2.43;
-    float d = 0.59;
-    float e = 0.14;
-    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
-}
-
 void main() {
-    vec3 hdrRadiance = texture(u_texture, fragmentTexCoord).rgb;
-    vec3 tonemapped = ACESFilm(hdrRadiance * 0.6);
-    vec3 gammaCorrectedColor = pow(tonemapped, vec3(1.0 / 2.2));
-    fragColor = vec4(gammaCorrectedColor, 1.0);
+    vec3 colour = texture(u_texture, fragmentTexCoord).rgb;
+    fragColor = vec4(colour, 1.0);
 }
