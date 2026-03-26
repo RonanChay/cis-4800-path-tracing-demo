@@ -79,11 +79,11 @@ int main(void) {
     Model path_trace_quad(0, &basic_lighting);
     path_trace_quad.init(fullscreen_quad, sizeof(fullscreen_quad)/sizeof(float), "fullscreen_quad");
 
-    GLuint fbo[2], texture[2];
-    for (int i = 0; i < 2; i++) {
-        glGenFramebuffers(1, &fbo[i]);
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
+    GLuint fbo, texture[2];
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
+    for (int i = 0; i < 2; i++) {
         glGenTextures(1, &texture[i]);
         glBindTexture(GL_TEXTURE_2D, texture[i]);
         glTexImage2D(
@@ -95,21 +95,14 @@ int main(void) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-        glFramebufferTexture2D(
-            GL_FRAMEBUFFER, 
-            GL_COLOR_ATTACHMENT0, 
-            GL_TEXTURE_2D, 
-            texture[i], 
-            0
-        );
     }
     int writeBuffer = 0;
     int frames = 0;
     int samples_per_pixel = 32;
     int max_bounces = 8;
 
-    int rendering_mode = 2;     // 1: no blending   |   2: temporal accumulation
+    int rendering_mode = 2;     // 1: no blending  |  2: temporal accumulation
+    int move_objects = 1;       // 1: no moving    |  2: yes moving
 
 	/********************************** 
         Create shader program 
@@ -136,15 +129,17 @@ int main(void) {
         float deltaTime = ((float)(timeSinceStart - oldTimeSinceStart)) / CLOCKS_PER_SEC;
         oldTimeSinceStart = timeSinceStart;
 
-        // Poll for window size changes - rebuild FBOs and reset frames if window size changed
+        // Poll for window size changes
+        // Rebuild FBO and reset frames if window size changed
         int prevWidth = windowWidth;
         int prevHeight = windowHeight;
         glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
         if (prevWidth != windowWidth || prevHeight != windowHeight) {
             frames = 0;
+            glDeleteTextures(2, texture);
             for (int i = 0; i < 2; i++) {
-                glGenFramebuffers(1, &fbo[i]);
-                glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
+                glGenFramebuffers(1, &fbo);
+                glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
                 glGenTextures(1, &texture[i]);
                 glBindTexture(GL_TEXTURE_2D, texture[i]);
@@ -157,14 +152,6 @@ int main(void) {
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-                glFramebufferTexture2D(
-                    GL_FRAMEBUFFER, 
-                    GL_COLOR_ATTACHMENT0, 
-                    GL_TEXTURE_2D, 
-                    texture[i], 
-                    0
-                );
             }
         }
 
@@ -187,7 +174,7 @@ int main(void) {
                 printf("Samples per pixel: %d\n", samples_per_pixel);
             }
         }
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_RELEASE)  {
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_RELEASE) {
             key_pressed[0] = 0;
         }
         if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
@@ -233,13 +220,29 @@ int main(void) {
             rendering_mode = 2;
         }
 
-        // --- Camera movement ---
-        static glm::vec3 lastCameraPos = camera.getPosition();
-        camera.update(deltaTime);
-        if (camera.getPosition() != lastCameraPos) {
-            frames = 0;
-            lastCameraPos = camera.getPosition();
+        // Move objects
+        if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS) {
+            printf(">>> Objects get jiggy with it\n");
+            move_objects = 2;
         }
+        if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS) {
+            printf(">>> Objects stop getting jiggy with it\n");
+            move_objects = 1;
+        }
+
+        // Reset frames
+        if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
+            printf(">>> Frame machine broke\n");
+            frames = 0;
+        }
+        
+        // --- Camera movement ---
+        // static glm::vec3 lastCameraPos = camera.getPosition();
+        // camera.update(deltaTime);
+        // if (camera.getPosition() != lastCameraPos) {
+        //     frames = 0;
+        //     lastCameraPos = camera.getPosition();
+        // }
         camera.sendToShader(&shader_path_tracer);
         camera.sendToShader(&shader_tone_mapper);
         shader_path_tracer.SetUniform3f("u_cameraPosition", camera.getPosition());
@@ -262,20 +265,29 @@ int main(void) {
             
             shader_path_tracer.Bind();
             shader_path_tracer.SetUniform1i("u_rendering_mode", rendering_mode);
+            shader_path_tracer.SetUniform1i("u_move_objects", move_objects);
             shader_path_tracer.SetUniform1f("u_time", cur_time);
             shader_path_tracer.SetUniform1i("u_max_bounces", max_bounces);
             shader_path_tracer.SetUniform1i("u_samples_per_pixel", samples_per_pixel);
             shader_path_tracer.SetUniform2f("u_resolution", glm::vec2(windowWidth, windowHeight));
-    
+            
             path_trace_quad.draw(&shader_path_tracer);
         }
         else {
             // Temporal accumulation
-            glBindFramebuffer(GL_FRAMEBUFFER, fbo[writeBuffer]);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+            glFramebufferTexture2D(
+                GL_FRAMEBUFFER, 
+                GL_COLOR_ATTACHMENT0, 
+                GL_TEXTURE_2D, 
+                texture[writeBuffer], 
+                0
+            );
             glClear(GL_COLOR_BUFFER_BIT);
             
             shader_path_tracer.Bind();
             shader_path_tracer.SetUniform1i("u_rendering_mode", rendering_mode);
+            shader_path_tracer.SetUniform1i("u_move_objects", move_objects);
             shader_path_tracer.SetUniform1i("u_frames", frames);
             shader_path_tracer.SetUniform1f("u_time", cur_time);
             shader_path_tracer.SetUniform1i("u_max_bounces", max_bounces);
@@ -290,23 +302,24 @@ int main(void) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glViewport(0, 0, windowWidth, windowHeight);
             glClear(GL_COLOR_BUFFER_BIT);
-    
-            shader_tone_mapper.Bind();
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, texture[writeBuffer]);
-            shader_tone_mapper.SetUniform1i("u_texture", 0);
-            path_trace_quad.draw(&shader_tone_mapper);
-    
-            writeBuffer = 1-writeBuffer;
+
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            glBlitFramebuffer(
+                0, 0, windowWidth, windowHeight, 
+                0, 0, windowWidth, windowHeight, 
+                GL_COLOR_BUFFER_BIT, GL_LINEAR
+            );
             frames++;
+            writeBuffer = 1-writeBuffer;
         }
 
 		glfwSwapBuffers(window);
 	}
-    for (int i = 0; i < 2; i++) {
-        glDeleteFramebuffers(1, &fbo[i]);
-        glDeleteTextures(1, &texture[i]);
-    }
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(2, texture);
 
 	glfwTerminate();
 	return 0;

@@ -28,6 +28,7 @@ uniform sampler2D u_accumulatedTexture;
 uniform vec2 u_resolution;
 uniform int u_samples_per_pixel;
 uniform int u_rendering_mode;
+uniform int u_move_objects;
 uniform int u_max_bounces;
 
 const float EPSILON = 0.001;
@@ -36,7 +37,7 @@ const float PI = 3.14159265358979;
 
 uint seed;
 
-// ------ Pseudo RNG taken from: https://stackoverflow.com/a/17479300 ------
+// ------ Pseudo RNG adapted from: https://stackoverflow.com/a/17479300 ------
 // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
 uint hash( uint x ) {
     x += ( x << 10u );
@@ -64,52 +65,64 @@ float rand() {
 // ------------------------------------------------------------------------
 
 // Generate ray in a random direction after bouncing on a surface
-// The generated ray is within hemisphere of normal
-// Taken from https://stackoverflow.com/questions/69510208/path-tracing-cosine-hemisphere-sampling-and-emissive-objects
-vec3 cosineWeightedHemisphere(vec3 norm) {
-    vec4 randNum = vec4(rand(), rand(), rand(), rand());
-    float r = pow(randNum.w, 1.0 / (1.0));
-    float angle = randNum.y * PI*2.0;
-    float sr = sqrt(1.0 - r * r);
-    vec3 ph = vec3(sr * cos(angle), sr * sin(angle), r);
-    vec3 tangent = normalize(randNum.zyx + vec3(rand(), rand(), rand()) - 1.0);
-    vec3 bitangent = cross(norm, tangent);
-    tangent = cross(norm, bitangent);
-    return normalize(tangent * ph.x + bitangent * ph.y + norm * ph.z);
+// The generated ray is within hemisphere of normal in a cosine-weighted distribution
+// Adapted from https://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/2D_Sampling_with_Multidimensional_Transformations
+vec3 cosineWeightedHemisphere(vec3 normal) {
+    // Uniformly sample random point on disk
+    vec2 randomDiskPoint;
+    vec2 point = vec2(rand(), rand());
+    float r = sqrt(point.x);
+    float theta = 2.0 * PI * point.y;
+    randomDiskPoint = r * vec2(cos(theta), sin(theta));
+
+    // Malley's method - convert disk point into cosine-weighted hemisphere
+    float y = sqrt(max(0.0, 1 - dot(randomDiskPoint, randomDiskPoint)));
+    vec3 localRay = vec3(randomDiskPoint.x, y, randomDiskPoint.y);
+
+    // Gram-Schmidt process:
+    // Convert localRay to worldRay by projecting world axes onto surface normal axes
+    // normal  : surface normal's y-axis
+    // right   : surface normal's x-axis
+    // forward : surface normal's z-axis
+    vec3 worldUp = abs(normal.z) < 0.999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
+    vec3 right = normalize(cross(worldUp, normal));
+    vec3 forward = cross(normal, right);
+
+    return right*localRay.x + forward*localRay.z + normal*localRay.y;
 }
 
 // Information about a ray
 struct Ray {
-    vec3 origin;
-    vec3 direction;
+    vec3 origin;    // Point of origin
+    vec3 direction; // Direction of ray
 };
 
 // Information about a ray-surface intersection
 struct HitInfo {
-    float distanceAlongRay;
-    vec3 normal;
-    vec3 objectColour;
-    vec3 objectLightIntensity;
-    float roughness;
+    float distanceAlongRay;     // distance along ray to point of intersection
+    vec3 normal;                // surface normal
+    vec3 objectColour;          // surface colour (albedo)
+    vec3 objectLightIntensity;  // intensity of emitted light from surface
+    float roughness;            // surface roughness
 };
 
+// Objects to be used in scenes
 struct Sphere {
     vec3 centre;
     float radius;
-    vec3 colour;
-    vec3 lightIntensity;
+    vec3 colour;         // albedo
+    vec3 lightIntensity; // intensity of emitted light from sphere
     float roughness;
 };
 struct Plane {
     vec3 point;
     vec3 normal;
-    vec3 colour;
-    vec3 lightIntensity;
-    float roughness;
+    vec3 colour;         // albedo
+    vec3 lightIntensity; // intensity of emitted light from plane           
+    float roughness;   
 };
 
 // Determines ray-sphere intersection
-// Returns points where ray enters and leaves sphere
 // Adapted from https://iquilezles.org/articles/intersectors/
 bool intersectsSphere(in Ray ray, in Sphere sphere, out HitInfo hit) {
     vec3 OC = ray.origin - sphere.centre;   // Distance between ray origin and sphere centre
@@ -132,6 +145,8 @@ bool intersectsSphere(in Ray ray, in Sphere sphere, out HitInfo hit) {
     return true;
 }
 
+// Determines ray-plane intersection
+// Adapted from Week 6 Ray Tracing slides
 bool intersectsPlane(in Ray ray, in Plane plane, out HitInfo hit) {
     if (dot(ray.direction, plane.normal) == 0.0) return false;    // Plane perpendicular to ray
     float t = (dot((plane.point - ray.origin), plane.normal)) / dot(ray.direction, plane.normal);
@@ -152,10 +167,13 @@ bool worldIntersect(in Ray ray, out HitInfo objectHit) {
     bool foundHit = false;
     HitInfo possibleHit;
 
-    // Scene model definition
+    // Objects in scene
+    vec3 lightPosition = vec3(0.0, 0.4, -3.0);
+    if (u_move_objects == 2) {
+        lightPosition = vec3(0.5*sin(u_time*0.5), 0.4, 0.5*cos(u_time*0.5) - 3.0);
+    }
     Sphere lightSphere = Sphere(
-        // vec3(0.0, 0.4, -3.0),
-        vec3(0.5*sin(u_time), 0.4, 0.5*cos(u_time) - 3.0),
+        lightPosition,
         0.1,
         vec3(0.0),
         vec3(200.0),
@@ -169,56 +187,57 @@ bool worldIntersect(in Ray ray, out HitInfo objectHit) {
         1.0
     );
     Sphere shinySphere = Sphere(
-        vec3(-0.4, -0.6, -4.0),
+        vec3(-0.3, -0.6, -4.0),
         0.2,
         vec3(0.3, 0.8, 0.3),
         vec3(0.0),
-        0.5
+        0.25
     );
     Sphere mirrorSphere = Sphere(
-        vec3(0.0, 0.0, -4.0),
-        0.25,
-        vec3(1.0),
-        vec3(0.0),
-        0.01
+        vec3(0.0, 0.0, -4.5),   // centre
+        0.25,                   // radius
+        vec3(1.0),              // colour
+        vec3(0.0),              // lightIntensity
+        0.01                    // roughness
     );
 
     Plane leftWall = Plane(
-        vec3(-1.0, 0.0, 0.0),
-        vec3(1.0, 0.0, 0.0),
-        0.8*vec3(0.8, 0.1, 0.1),
-        vec3(0.0),
-        1.0
+        vec3(-1.0, 0.0, 0.0),       // point
+        vec3(1.0, 0.0, 0.0),        // normal
+        0.8*vec3(0.65, 0.15, 0.15), // colour
+        vec3(0.0),                  // lightIntensity
+        1.0                         // roughness
     );
     Plane rightWall = Plane(
         vec3(1.0, 0.0, 0.0),
         vec3(-1.0, 0.0, 0.0),
-        0.8*vec3(0.1, 0.8, 0.1),
+        0.8*vec3(0.15, 0.65, 0.15),
         vec3(0.0),
         1.0
     );
     Plane topWall = Plane(
         vec3(0.0, 0.7, 0.0),
         vec3(0.0, -1.0, 0.0),
-        vec3(0.7, 0.4, 0.6),
+        vec3(0.7, 0.7, 0.7),
         vec3(0.0),
         1.0
     );
     Plane bottomWall = Plane(
         vec3(0.0, -1.0, 0.0),
         vec3(0.0, 1.0, 0.0),
-        vec3(0.7, 0.4, 0.6),
+        vec3(0.7, 0.7, 0.7),
         vec3(0.0),
         1.0
     );
     Plane backWall = Plane(
         vec3(0.0, 0.0, -6.0),
         vec3(0.0, 0.0, 1.0),
-        vec3(0.7, 0.4, 0.6),
+        vec3(0.7, 0.7, 0.7),
         vec3(0.0),
         1.0
     );
 
+    // Find closest intersection
     if (intersectsSphere(ray, lightSphere, possibleHit) && possibleHit.distanceAlongRay < objectHit.distanceAlongRay) {
         objectHit = possibleHit;
         foundHit = true;
@@ -231,12 +250,14 @@ bool worldIntersect(in Ray ray, out HitInfo objectHit) {
         objectHit = possibleHit;
         foundHit = true;
     }
-    if (intersectsSphere(ray, mirrorSphere, possibleHit) && possibleHit.distanceAlongRay < objectHit.distanceAlongRay) {
+    if (intersectsSphere(ray, mirrorSphere, possibleHit) 
+        && possibleHit.distanceAlongRay < objectHit.distanceAlongRay) {
         objectHit = possibleHit;
         foundHit = true;
     }
 
-    if (intersectsPlane(ray, leftWall, possibleHit) && possibleHit.distanceAlongRay < objectHit.distanceAlongRay) {
+    if (intersectsPlane(ray, leftWall, possibleHit) 
+        && possibleHit.distanceAlongRay < objectHit.distanceAlongRay) {
         objectHit = possibleHit;
         foundHit = true;
     }
@@ -260,9 +281,10 @@ bool worldIntersect(in Ray ray, out HitInfo objectHit) {
     return foundHit;
 }
 
+// Generates a new ray using BRDF to simulate bouncing off a material
 Ray getBRDFRay(Ray ray, HitInfo hit) {
-    vec3 faceNormal = dot(ray.direction, hit.normal) < 0.0
-                      ? hit.normal : -hit.normal;
+    // For back-face bounces
+    vec3 faceNormal = dot(ray.direction, hit.normal) < 0.0 ? hit.normal : -hit.normal;
 
     vec3 diffuseDirection = cosineWeightedHemisphere(hit.normal);
     vec3 reflectDirection = reflect(ray.direction, hit.normal);
@@ -272,29 +294,35 @@ Ray getBRDFRay(Ray ray, HitInfo hit) {
     return Ray(brdfRayOrigin, brdfRayDirection);
 }
 
+// Calculates pixel colour for one ray from camera
+// Adapted from https://iquilezles.org/articles/simplepathtracing/
 vec3 calcPixelColour(Ray cameraRay) {
     Ray currentRay = cameraRay;
-    vec3 pixelColour = vec3(0.0);
-    vec3 rayIntensity = vec3(1.0);
+    vec3 pixelColour = vec3(0.0);   // Final colour of pixel
+    vec3 rayIntensity = vec3(1.0);  // Light intensity of ray
 
     for (int i = 0; i < u_max_bounces; i++) {
         HitInfo hit;
         bool hasHitObject = worldIntersect(currentRay, hit);
 
         if (!hasHitObject) {
+            // No objects hit, sample pseudo-skybox colour
             vec3 skyColour = vec3(0.2, 0.5, 1.0);
             pixelColour  += rayIntensity * skyColour;
             break;
         }
 
+        // Accumulate pixel colour from light source
         pixelColour += rayIntensity * hit.objectLightIntensity;
+        // Attenuate ray after bounce
         rayIntensity *= hit.objectColour;
 
         // Optimization: Russian Roulette Termination
         if (i > 4) {
-            float survivalProbability = max(rayIntensity.r,
-                                        max(rayIntensity.g, rayIntensity.b));
+            float survivalProbability = max(rayIntensity.r, 
+                            max(rayIntensity.g, rayIntensity.b));
             if (rand() > survivalProbability) break;
+            // Scale remaining rays up
             rayIntensity /= survivalProbability;
         }
 
@@ -307,25 +335,31 @@ void main() {
     vec3 colour = vec3(0.0);
 
     for (int s = 0; s < u_samples_per_pixel; s++) {
+        // Deterministic seed
         seed = uint(gl_FragCoord.x) * 1973u
             ^ uint(gl_FragCoord.y) * 9277u
             ^ uint(u_frames * u_samples_per_pixel + s + 1) * 26699u;
 
         vec2 subPixelJitter = vec2(rand(), rand()) - 0.5;
         vec2 jitteredPixel = gl_FragCoord.xy + subPixelJitter;
-        vec2 pos = (jitteredPixel / vec2(u_resolution.x, u_resolution.y)) * 2.0 - 1.0;
+        vec2 pos = (jitteredPixel 
+            / vec2(u_resolution.x, u_resolution.y)) * 2.0 - 1.0;
         pos.x *= u_resolution.x / u_resolution.y;
 
-        Ray firstRay = Ray(u_cameraPosition, normalize(vec3(pos, -FOV)));
+        Ray firstRay = Ray(
+            u_cameraPosition, normalize(vec3(pos, -FOV))
+        );
 
         colour += calcPixelColour(firstRay);
     }
     colour /= float(u_samples_per_pixel);
 
     if (u_rendering_mode == 2) {
-        vec3 previousFrameAverage = texture(u_accumulatedTexture, fragmentTexCoord).rgb;
+        // Temporal accumulation
+        // Blending previous frame to current frame
+        vec3 prevFrame = texture(u_accumulatedTexture, fragmentTexCoord).rgb;
         float blendWeight = 1.0 / float(u_frames + 1);
-        colour = mix(previousFrameAverage, colour, blendWeight);
+        colour = mix(prevFrame, colour, blendWeight);
     }
 
     fragColor = vec4(colour, 1.0);
